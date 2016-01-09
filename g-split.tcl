@@ -2,7 +2,7 @@
 
 # Quick and dirty tool for splitting a large G-Code file into smaller chunks. Nothing fancy like geometric splitting or even splitting by size/line setting - I just want something to get some large v-carve scripts into manageable chunks.  The important thing is to add a header and footer to each output file, name them, and make sure the splits don't affect the resulting movement (e.g. split on Z-lifts and perhaps add an extra X,Y move).
 
-# Currently we assume no more than 100 output files.
+# Currently we blithely assume no more than 99 output files.
 
 # Will accept output basename and suffix on the command line though.  Maybe approximate (minimum would be easiest) lines per output file.  Easy enough though to just modify the settings in this script directly, heh.
 
@@ -11,10 +11,11 @@
 
 set Debugging true
 
-set basename st_j_
+set basename out
 set suffix .ngc
 set line_limit 500000
 set safe_z_height 4
+set default_feedrate 1234
 
 set header {G21
 G90
@@ -58,10 +59,12 @@ chan configure $input_stream -buffering full -buffersize 524288
 
 puts stderr "Splitting $source_filename..."
 
+# Variables that need to be defined before processing the file:
 set ::file_count 0
 set ::line_count 0
 set ::abs_line_count 0
 #set z_lift_count 0
+set ::last_feedrate $default_feedrate
 
 # No, leave these unset:
 #set last_x
@@ -86,6 +89,8 @@ proc start_new_file {} {
 	# Write header and the initial positioning moves (the last two lines of the input) to the new file:
 	if {$::file_count > 1} {
 		puts $::output_stream $::header
+		# TODO: inject feedrate. F (and S) are modal, so it should be fine to issue them separately from G1.
+		puts $::output_stream "F$::last_feedrate"
 	#	puts $::output_stream "$::last_line ( last_line )"
 	#	puts $::output_stream "$::line ( line )"
 	}
@@ -108,6 +113,9 @@ while {true} {
 	}
 
 	# Check line number and start a new output file if possible.  We'll need to look for a G0 with Z something positive.  Actually, maybe we don't need to store the original code: we can just generate a new G0 Zwhatever G0 Xn Yn.  However we did it, we'd have to keep a record of recent line data.  Though maybe avoiding several regexps per line would be good for efficiency - simply store the last line and only look for matching patterns if we've reached the line limit.
+
+	# If the line contains a feedrate, make a note of it in case we need to start a new file:
+	regexp -nocase "F(\[0-9\.\]+)" $line entire_match ::last_feedrate
 
 	if {$line_count >= $line_limit} {
 		# Look for a good point to split (Z-lift):
