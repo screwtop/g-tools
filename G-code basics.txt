@@ -1,0 +1,39 @@
+Some notes about G-code
+
+Valuable basics from:
+http://www.cnccookbook.com/CCCNCGCodeBlocks.htm
+http://www.smithy.com/cnc-reference-info/language-overview/format-of-line/page/0
+
+NIST RS274/NGC document has an interesting list of canonical C++-compatible textual names for the commands, which we could use as assember/disassembler symbols.    E.g.
+	SELECT_PLANE
+	USE_LENGTH_UNITS
+
+--
+
+Things are not always as you might expect!
+
+G-code "commands" are properly termed "words", and many of them take addresses (numbers).  "G00" is really the word "G" with the address "0".
+
+A "line" is actually a "block", and the words within a block may not be execute in the order specified!  If the order is important, put the code in different blocks (i.e. on different lines).
+
+	For example, what I had thought of as "Spindle Start command with Speed=<n>" is actually "Spindle Start" and "Set Spindle Speed".
+
+	Could this be why the commands I was using to try to stop the spindle weren't working as expected?  Note that "S" is likely executed before "M3/4/5" if within the same block.
+
+G-code is modal.  A "G0" command is really a block (well, not a "block" in the G-code sense, which is a line of code) that sets the mode to "move", and then any co-ordinates following are treated as move instructions.
+
+	You can't put conflicting modal instructions in a single block, e.g. "G00" and "G01".
+
+Comments are delimited in (parentheses).  Comments may not span lines, and they may not be nested.
+
+	Interestingly, you can include "MSG" at the start of comment text and the machine should display the comment text.
+
+	Subtly, only the last comment within a block (i.e., on a line) will be used.
+
+	There's also "/" for block skip.  These can be numbered for crude conditional control.
+
+Spaces and tabs are entirely ignored (a parser could strip them completely).  Line endings may be CR, LF, or both, and define blocks.
+
+Line numbers may not exceed 99999.
+
+
