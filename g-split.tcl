@@ -1,15 +1,13 @@
 #!/usr/bin/env tclsh
 
-# Quick and dirty tool for splitting a large G-Code file into smaller chunks. Nothing fancy like geometric splitting or even splitting by size/line setting - I just want something to get some large v-carve scripts into manageable chunks.  The important thing is to add a header and footer to each output file, name them, and make sure the splits don't affect the resulting movement (e.g. split on Z-lifts and perhaps add an extra X,Y move).
+# Quick and dirty tool for splitting a large G-Code file into smaller chunks. Nothing fancy like geometric splitting or even splitting by size/line setting or number of output files - I just want something to get some large v-carve scripts into manageable chunks (my router controller seems to have a 64 MiB limit on G-Code).  The important thing is to add a header and footer to each output file, name them, and make sure the splits don't affect the resulting movement (e.g. split on Z-lifts and perhaps add an extra X,Y move) - this is why we don't just use `split`!
 
 # Currently we blithely assume no more than 99 output files.
 
 # Will accept output basename and suffix on the command line though.  Maybe approximate (minimum would be easiest) lines per output file.  Easy enough though to just modify the settings in this script directly, heh.
 
-# TODO: inject feed rate(s) into output file!  Just record the last F-number and add it to the first G1 in the new file?  Or can we set the feedrate independently?
 
-
-set Debugging true
+set Debugging false
 
 set basename out
 set suffix .ngc
@@ -17,20 +15,20 @@ set line_limit 500000
 set safe_z_height 4
 set default_feedrate 1234
 
-set header {G21
+set header "G21
 G90
 G64 P0.001
 G40
 G17
 M3 S3
-G0 Z4.000
-}
+G0 Z${safe_z_height}
+"
 
-set footer {G0 Z4.000
+set footer "G0 Z${safe_z_height}
 M5
 M2
-}
-# TODO: The G0 Z4 is probably redundant there.  And it should use $::safe_z_height.
+"
+# TODO: The G0 Z4 is probably redundant there.
 
 
 # TODO: factor out patterns and other comment-related code for re-use.
@@ -40,24 +38,18 @@ if {$Debugging} {puts "argv=\"$argv\""}
 #set basename [lindex $argv 1]
 #set 
 
-if {[llength $argv] != 3} {
-	puts stderr "Usage: g-split input_filename output_basename output_suffix"
+if {[llength $argv] != 4} {
+	puts stderr "Usage: g-split input_filename num_lines output_basename output_suffix"
 	exit
 }
-lassign $argv source_filename basename suffix
-# TODO: and line count?
-puts "$source_filename $basename $suffix"
+lassign $argv source_filename line_limit basename suffix
 
 
 # No pipeline support: have to read from a true file:
 set input_stream [open $source_filename r]
 
-# Q: Does this make more fasterer?
-chan configure $input_stream -buffering full -buffersize 524288
-# A: 1:56 first time, 1:57 primed buffers, 1:57 buffering above added.  So not much point. ;)
 
-
-puts stderr "Splitting $source_filename..."
+puts stderr "Splitting \"$source_filename\"..."
 
 # Variables that need to be defined before processing the file:
 set ::file_count 0
@@ -70,11 +62,17 @@ set ::last_feedrate $default_feedrate
 #set last_x
 #set last_y
 
+# These however need to be set so that the first call to start_new_file works:
+set line {}
+set last_line {}
+
+# This is called each time we create a new output file:
 proc start_new_file {} {
-	# TODO: write footer to old (current) file:
+	# Write footer to old (current) file:
 	catch  {
 		# The catch is just a lazy way of getting the first invocation to run cleanly when there is no output stream yet.
 		# Don't need to duplicate the last two lines - they'll have been written anyway as part of normal copying.
+		# This won't get called on the very last output file (which will already have the endgame G-Code) as start_new_file won't be called then.
 	#	puts $::output_stream $::last_line
 	#	puts $::output_stream $::line
 		puts $::output_stream $::footer
@@ -84,24 +82,22 @@ proc start_new_file {} {
 	set ::line_count 0
 #	puts "file_count = $::file_count"
 	set new_filename "${::basename}[format %02i ${::file_count}]${::suffix}"
-	puts "Starting new file $new_filename at input line $::abs_line_count"
+	puts "Writing \"$new_filename\" from input line $::abs_line_count"
 	set ::output_stream [open $new_filename w]
-	# Write header and the initial positioning moves (the last two lines of the input) to the new file:
+	# Write header and the initial positioning moves (the last two lines of the input) to the new file (but not the first output file, as it should already have that stuff):
 	if {$::file_count > 1} {
 		puts $::output_stream $::header
-		# TODO: inject feedrate. F (and S) are modal, so it should be fine to issue them separately from G1.
+		# nject feedrate. F (and S) are modal, so it should be fine to issue them separately from G1.
 		puts $::output_stream "F$::last_feedrate"
 	#	puts $::output_stream "$::last_line ( last_line )"
 	#	puts $::output_stream "$::line ( line )"
 	}
 }
 
-# These however need to be set so that the first call to start_new_file works:
-set line {}
-set last_line {}
 
 start_new_file
 
+# Main loop: process the input file and copy the lines to the output, starting a new output file every $line_limit lines (approximately - we split at Z-lifts to avoid mess).
 while {true} {
 	set line [gets $input_stream]
 	if {[eof $input_stream]} {
