@@ -78,7 +78,9 @@ while {true} {
 	}
 
 	# Count z-lifts (note that we sometimes see negative zero!):
-	if {[regexp -nocase "G0 .*X(\[-0-9\.\]+)" $line entire_match $axis]} {
+	# Might wanna look carefully at a variety of G-Code for this - I expect it would be easy to double-count, or maybe even miss some if they use G1.  Perhaps match G1/G0?
+	if {[regexp -nocase "G0 .*Z(\[-0-9\.\]+)" $line entire_match $axis]} {
+		incr z_lift_count
 	}
 
 	if {$Debugging} {puts stderr "\"$line\""}
