@@ -14,7 +14,7 @@ Things are not always as you might expect!
 
 G-code "commands" are properly termed "words", and many of them take addresses (numbers).  "G00" is really the word "G" with the address "0".
 
-A "line" is actually a "block", and the words within a block may not be execute in the order specified!  If the order is important, put the code in different blocks (i.e. on different lines).
+A "line" is actually a "block", and the words within a block may not be executed in the order specified!  If the order is important, put the code in different blocks (i.e. on different lines).
 
 	For example, what I had thought of as "Spindle Start command with Speed=<n>" is actually "Spindle Start" and "Set Spindle Speed".
 

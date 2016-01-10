@@ -4,7 +4,7 @@
 # - dimensions of the machining extent (what about arcs?!)
 # - maybe start and end points
 # - number of (non-comment) lines
-# - number of Z-lifts (identified by going above 0? 3D printer jobs wouldbe different, though.)
+# - number of Z-lifts (identified by going above 0? 3D printer jobs would be different, though.)
 # - rough estimate of total distance travelled? time?
 
 set Debugging false
