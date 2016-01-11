@@ -9,7 +9,7 @@ array set extent {X 600 Y 900 Z -100}
 
 # Move + and - around the initial point, or just away from home and then return?
 set bipolar_motion false
-set starting_step_size 0.1
+set starting_step_size 0.07
 
 # Acceleration will often prevent reaching these maxima:
 set ::max_feed_rate 4800
@@ -51,7 +51,7 @@ proc sgn x {expr {$x<0? -1: $x>0}}	;# RS
 # TODO: maybe have it so you can specify the number of steps, and have it divide that down from the axis extent.
 proc increase {varname} {
 	upvar $varname val
-	set val [expr {$val * 1.5}]
+	set val [expr {$val * 2.0}]
 }
 
 
@@ -90,7 +90,7 @@ if {$bipolar_motion} {
 		if {$axis eq "Z"} {puts "F${::max_plunge_rate}"}
 		# TODO: maybe start with very small movements (like, fractions of a mm) and work up exponentially to larger sizes.
 		for {set step $starting_step_size} {$step < $abs_extent} {increase step} {
-			repeat 4 {
+			repeat 2 {
 				puts "G1 ${axis}[format {%02.4f} [expr {$step * $direction}]]"
 				puts "G1 ${axis}0.00"
 			}
